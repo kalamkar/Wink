@@ -1,10 +1,13 @@
 package com.ojogaze.wink;
 
+import android.Manifest;
+import android.content.pm.PackageManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.util.Pair;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.TextView;
 
 public class MainActivity extends AppCompatActivity implements
@@ -33,20 +36,32 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     @Override
-    protected void onStart() {
-        super.onStart();
+    protected void onResume() {
+        super.onResume();
         patchClient = new BluetoothSmartClient(this, this);
-        patchClient.startScan();
+        if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, 0);
+        } else {
+            patchClient.startScan();
+        }
     }
 
     @Override
-    protected void onStop() {
+    protected void onPause() {
         if (patchClient != null) {
             patchClient.stopScan();
             patchClient.close();
             patchClient = null;
         }
-        super.onStop();
+        super.onPause();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] results) {
+        if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
+            patchClient.startScan();
+        }
     }
 
     public void onScanStart() {
@@ -84,9 +99,9 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     public void onNewValues(int values[]) {
-        System.arraycopy(chartValues, values.length, chartValues, 0, values.length);
-        System.arraycopy(chartValues, chartValues.length - values.length,
-                values, values.length, values.length);
+        System.arraycopy(chartValues, values.length, chartValues, 0,
+                chartValues.length - values.length);
+        System.arraycopy(values, 0, chartValues, chartValues.length - values.length, values.length);
 
         runOnUiThread(new Runnable() {
             @Override
@@ -94,12 +109,15 @@ public class MainActivity extends AppCompatActivity implements
                 if (isDestroyed() || isRestricted() || isFinishing()) {
                     return;
                 }
+                chart.clear();
                 chart.updateChannel1(chartValues, Pair.create(0, 255));
+                chart.updateUI();
             }
         });
     }
 
     private void hideBars() {
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         findViewById(R.id.chart).setSystemUiVisibility(
                 View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                         | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
