@@ -19,10 +19,6 @@ import android.util.Log;
 import android.widget.Toast;
 
 public class BluetoothSmartClient extends BluetoothGattCallback {
-    public static final int SAMPLING_FREQUENCY = 200;
-    public static final int SAMPLE_INTERVAL_MS = 5;
-    public static final int SAMPLES_PER_BROADCAST = 20; // Hardcoded in FW
-
 	private static final String TAG = "BluetoothSmartClient";
 
     private static final long DATA_UUID = 0x404846A1;

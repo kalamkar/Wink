@@ -2,19 +2,26 @@ package com.ojogaze.wink;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.util.Pair;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.TextView;
 
+import biz.source_code.dsp.filter.FilterPassType;
+import biz.source_code.dsp.filter.IirFilter;
+import biz.source_code.dsp.filter.IirFilterDesignExstrom;
+
 public class MainActivity extends AppCompatActivity implements
         BluetoothSmartClient.BluetoothDeviceListener {
     private final static String TAG = "MainActivity";
 
     public static final int GRAPH_LENGTH = 1000;			// 5 seconds at 200Hz
+
+    private final IirFilter filter = new IirFilter(IirFilterDesignExstrom.design(
+            FilterPassType.bandpass, 1, 1.024 / Config.SAMPLING_FREQ, 2.56 / Config.SAMPLING_FREQ));
 
     private final int chartValues[] = new int[GRAPH_LENGTH];
     private BluetoothSmartClient patchClient;
@@ -101,8 +108,13 @@ public class MainActivity extends AppCompatActivity implements
     public void onNewValues(int values[]) {
         System.arraycopy(chartValues, values.length, chartValues, 0,
                 chartValues.length - values.length);
-        System.arraycopy(values, 0, chartValues, chartValues.length - values.length, values.length);
 
+         System.arraycopy(values, 0, chartValues, chartValues.length - values.length, values.length);
+//        for (int i = 0; i < values.length; i++) {
+//            chartValues[chartValues.length - values.length + i] = (int) filter.step(values[i]);
+//        }
+
+        final Pair<Integer, Integer> minMax = getMinMax(chartValues);
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -110,7 +122,7 @@ public class MainActivity extends AppCompatActivity implements
                     return;
                 }
                 chart.clear();
-                chart.updateChannel1(chartValues, Pair.create(0, 255));
+                chart.updateChannel1(chartValues, /* minMax*/ Pair.create(100, 150));
                 chart.updateUI();
             }
         });
@@ -125,5 +137,15 @@ public class MainActivity extends AppCompatActivity implements
                         | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                         | View.SYSTEM_UI_FLAG_FULLSCREEN
                         | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+    }
+
+    private static Pair<Integer, Integer> getMinMax(int series[]) {
+        int min = Integer.MAX_VALUE;
+        int max = Integer.MIN_VALUE;
+        for (int value : series) {
+            min = value < min ? value : min;
+            max = value > max ? value : max;
+        }
+        return Pair.create(min, max);
     }
 }
