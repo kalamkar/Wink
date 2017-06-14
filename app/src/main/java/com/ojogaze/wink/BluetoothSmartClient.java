@@ -18,14 +18,11 @@ import android.content.Intent;
 import android.util.Log;
 import android.widget.Toast;
 
-public class BluetoothSmartClient extends BluetoothGattCallback {
+public class BluetoothSmartClient extends EogDevice {
 	private static final String TAG = "BluetoothSmartClient";
 
     private static final long DATA_UUID = 0x404846A1;
     private static final String BT_DEVICE_NAME_PREFIX = "Dovetail";
-
-    private final BluetoothDeviceListener listener;
-	private final Context context;
 
 	private final BluetoothAdapter adapter;
 	private final BluetoothLeScanner scanner;
@@ -35,18 +32,8 @@ public class BluetoothSmartClient extends BluetoothGattCallback {
 
 	private int state = BluetoothProfile.STATE_DISCONNECTED;
 
-    public interface BluetoothDeviceListener {
-    	void onScanStart();
-    	void onScanResult(String deviceAddress);
-    	void onScanEnd();
-    	void onConnect(String address);
-    	void onDisconnect(String address);
-    	void onNewValues(int values[]);
-    }
-
-	public BluetoothSmartClient(Context context, BluetoothDeviceListener listener) {
-		this.listener = listener;
-		this.context = context;
+	public BluetoothSmartClient(Context context) {
+        super(context);
 
 		BluetoothManager bluetoothManager =
 				(BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE);
@@ -69,10 +56,68 @@ public class BluetoothSmartClient extends BluetoothGattCallback {
 			name = name == null ? result.getScanRecord().getDeviceName() : name;
 			if (name != null && name.startsWith(BT_DEVICE_NAME_PREFIX)) {
 				Log.i(TAG, String.format("Found device %s", name));
-				listener.onScanResult(result.getDevice().getAddress());
+				BluetoothSmartClient.this.onScanResult(result.getDevice().getAddress());
 			}
 			super.onScanResult(callbackType, result);
 		}
+	};
+
+	private BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
+        @Override
+        public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+            BluetoothSmartClient.this.gatt = gatt;
+            BluetoothSmartClient.this.state = newState;
+            if (newState == BluetoothProfile.STATE_CONNECTED) {
+                gatt.discoverServices();
+                onConnect(gatt.getDevice().getAddress());
+            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                onDisconnect(gatt.getDevice().getAddress());
+                close();
+            } else {
+                Log.e(TAG, String.format(
+                        "GATT server %s changed to unknown new state %d and status %d",
+                        gatt.getDevice().getAddress(), newState, status));
+            }
+        }
+
+        @Override
+        public void onServicesDiscovered(BluetoothGatt gatt, int status) {
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                Log.e(TAG, "onServicesDiscovered received error code: " + status);
+                return;
+            }
+            for (BluetoothGattService service : gatt.getServices()) {
+                for (BluetoothGattCharacteristic characteristic : service.getCharacteristics()) {
+                    long uuid = characteristic.getUuid().getMostSignificantBits() >> 32;
+                    if (uuid == DATA_UUID) {
+                        sensorData = characteristic;
+                    }
+                }
+            }
+
+            if (sensorData != null) {
+                Log.d(TAG, String.format("Found data UUID %s",
+                        Long.toHexString(sensorData.getUuid().getMostSignificantBits())));
+                enableNotifications();
+            } else {
+                Log.e(TAG, "Could not find Sensor Data characteristic.");
+            }
+        }
+
+        @Override
+        public void onCharacteristicChanged(BluetoothGatt gatt,
+                                            BluetoothGattCharacteristic characteristic) {
+            // gatt.readCharacteristic(sensorData);
+            readCharacteristic(characteristic);
+            super.onCharacteristicChanged(gatt, characteristic);
+        }
+
+        @Override
+        public void onCharacteristicRead(BluetoothGatt gatt,
+                                         BluetoothGattCharacteristic characteristic, int status) {
+            readCharacteristic(characteristic);
+            super.onCharacteristicRead(gatt, characteristic, status);
+        }
 	};
 
 	public void startScan() {
@@ -80,15 +125,16 @@ public class BluetoothSmartClient extends BluetoothGattCallback {
 		ScanSettings settings = new ScanSettings.Builder()
 				.setScanMode(ScanSettings.SCAN_MODE_BALANCED).setReportDelay(0).build();
 		scanner.startScan(null, settings, callback);
-		listener.onScanStart();
+		onScanStart();
 	}
 
 	public void stopScan() {
 		Log.i(TAG, "Stopping scan for BTLE patch.");
 		scanner.stopScan(callback);
-		listener.onScanEnd();
+		onScanEnd();
 	}
 
+    @Override
 	public void connect(String address) {
 		if (address == null || address.isEmpty()) {
 			Log.e(TAG, "No BluetoothLE device given to connect.");
@@ -98,62 +144,8 @@ public class BluetoothSmartClient extends BluetoothGattCallback {
 			Log.e(TAG, "Bluetooth adapther is null or disabled.");
 			return;
 		}
-		adapter.getRemoteDevice(address).connectGatt(context, false /* auto connect */, this);
-	}
-
-	@Override
-    public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
-        this.gatt = gatt;
-        this.state = newState;
-        if (newState == BluetoothProfile.STATE_CONNECTED) {
-        	gatt.discoverServices();
-        	listener.onConnect(gatt.getDevice().getAddress());
-        } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-        	listener.onDisconnect(gatt.getDevice().getAddress());
-        	close();
-        } else {
-        	Log.e(TAG, String.format("GATT server %s changed to unknown new state %d and status %d",
-        			gatt.getDevice().getAddress(), newState, status));
-        }
-    }
-
-    @Override
-    public void onServicesDiscovered(BluetoothGatt gatt, int status) {
-        if (status != BluetoothGatt.GATT_SUCCESS) {
-        	Log.e(TAG, "onServicesDiscovered received error code: " + status);
-        	return;
-        }
-    	for (BluetoothGattService service : gatt.getServices()) {
-    		for (BluetoothGattCharacteristic characteristic : service.getCharacteristics()) {
-    			long uuid = characteristic.getUuid().getMostSignificantBits() >> 32;
-    			if (uuid == DATA_UUID) {
-    				sensorData = characteristic;
-    			}
-    		}
-    	}
-
-    	if (sensorData != null) {
-        	Log.d(TAG, String.format("Found data UUID %s",
-        			Long.toHexString(sensorData.getUuid().getMostSignificantBits())));
-        	enableNotifications();
-    	} else {
-    		Log.e(TAG, "Could not find Sensor Data characteristic.");
-    	}
-    }
-
-	@Override
-	public void onCharacteristicChanged(BluetoothGatt gatt,
-			BluetoothGattCharacteristic characteristic) {
-        // gatt.readCharacteristic(sensorData);
-		readCharacteristic(characteristic);
-		super.onCharacteristicChanged(gatt, characteristic);
-	}
-
-	@Override
-	public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic,
-                                     int status) {
-		readCharacteristic(characteristic);
-		super.onCharacteristicRead(gatt, characteristic, status);
+		adapter.getRemoteDevice(address)
+                .connectGatt(context, false /* auto connect */, gattCallback);
 	}
 
 	private void readCharacteristic(BluetoothGattCharacteristic characteristic) {
@@ -163,9 +155,10 @@ public class BluetoothSmartClient extends BluetoothGattCallback {
 			intValues[i] = values[i] & 0xFF;
 		}
 
-		listener.onNewValues(intValues);
+		onNewValues(intValues);
 	}
 
+    @Override
 	public boolean isConnected() {
 		return state == BluetoothProfile.STATE_CONNECTED;
 	}
@@ -174,6 +167,7 @@ public class BluetoothSmartClient extends BluetoothGattCallback {
 		return gatt == null ? null : gatt.getDevice().getAddress();
 	}
 
+    @Override
 	public void close() {
 		if (gatt == null) {
 	        return;
@@ -210,16 +204,5 @@ public class BluetoothSmartClient extends BluetoothGattCallback {
 			success = success && gatt.writeDescriptor(descriptor);
 		}
 		return success;
-	}
-
-	public static void maybeEnableBluetooth(Activity activity) {
-		BluetoothManager bluetoothManager =
-				(BluetoothManager) activity.getSystemService(Context.BLUETOOTH_SERVICE);
-		BluetoothAdapter bluetooth = bluetoothManager.getAdapter();
-
-		if (bluetooth == null || !bluetooth.isEnabled()) {
-			Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-			activity.startActivityForResult(enableBtIntent, 0);
-		}
 	}
 }

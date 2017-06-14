@@ -14,8 +14,7 @@ import biz.source_code.dsp.filter.FilterPassType;
 import biz.source_code.dsp.filter.IirFilter;
 import biz.source_code.dsp.filter.IirFilterDesignExstrom;
 
-public class MainActivity extends AppCompatActivity implements
-        BluetoothSmartClient.BluetoothDeviceListener {
+public class MainActivity extends AppCompatActivity implements EogDevice.Observer {
     private final static String TAG = "MainActivity";
 
     public static final int GRAPH_LENGTH = 1000;			// 5 seconds at 200Hz
@@ -24,7 +23,7 @@ public class MainActivity extends AppCompatActivity implements
             FilterPassType.bandpass, 1, 1.024 / Config.SAMPLING_FREQ, 2.56 / Config.SAMPLING_FREQ));
 
     private final int chartValues[] = new int[GRAPH_LENGTH];
-    private BluetoothSmartClient patchClient;
+    private EogDevice device;
 
     private ChartFragment chart;
     private TextView count;
@@ -36,7 +35,7 @@ public class MainActivity extends AppCompatActivity implements
 
         hideBars();
 
-        BluetoothSmartClient.maybeEnableBluetooth(this);
+        EogDevice.maybeEnableBluetooth(this);
 
         chart = (ChartFragment) getSupportFragmentManager().findFragmentById(R.id.chart);
         count = (TextView) findViewById(R.id.count);
@@ -45,21 +44,23 @@ public class MainActivity extends AppCompatActivity implements
     @Override
     protected void onResume() {
         super.onResume();
-        patchClient = new BluetoothSmartClient(this, this);
+        device = new BluetoothSmartClient(this);
+        device.add(this);
         if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, 0);
         } else {
-            patchClient.startScan();
+            device.startScan();
         }
     }
 
     @Override
     protected void onPause() {
-        if (patchClient != null) {
-            patchClient.stopScan();
-            patchClient.close();
-            patchClient = null;
+        if (device != null) {
+            device.stopScan();
+            device.remove(this);
+            device.close();
+            device = null;
         }
         super.onPause();
     }
@@ -67,7 +68,7 @@ public class MainActivity extends AppCompatActivity implements
     @Override
     public void onRequestPermissionsResult(int requestCode, String permissions[], int[] results) {
         if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
-            patchClient.startScan();
+            device.startScan();
         }
     }
 
@@ -81,8 +82,8 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     public void onScanResult(String deviceAddress) {
-        patchClient.stopScan();
-        patchClient.connect(deviceAddress);
+        device.stopScan();
+        device.connect(deviceAddress);
     }
 
     public void onScanEnd() {
@@ -100,8 +101,8 @@ public class MainActivity extends AppCompatActivity implements
 
     public void onDisconnect(String address) {
         Log.i(TAG, String.format("Disconnected from %s", address));
-        if (patchClient != null) {
-            patchClient.startScan();
+        if (device != null) {
+            device.startScan();
         }
     }
 
