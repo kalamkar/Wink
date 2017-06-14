@@ -12,10 +12,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.ref.WeakReference;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.UUID;
 
 public class ShimmerClient extends EogDevice {
     private static final String TAG = "ShimmerClient";
+
+    private static final float SAMPLING_FREQ = 51.2f;
 
     private static final UUID SHIMMER_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
     private static final String BT_DEVICE_NAME_PREFIX = "Shimmer3";
@@ -44,10 +48,18 @@ public class ShimmerClient extends EogDevice {
 
     @Override
     public void startScan() {
+        onScanStart();
+        new Timer().schedule(new TimerTask() {
+            @Override
+            public void run() {
+                onScanResult("Shimmer");
+            }
+        }, 500);
     }
 
     @Override
     public void stopScan() {
+        onScanEnd();
     }
 
     @Override
@@ -72,6 +84,11 @@ public class ShimmerClient extends EogDevice {
     @Override
     public boolean isConnected() {
         return connection != null;
+    }
+
+    @Override
+    public float getSamplingFrequency() {
+        return SAMPLING_FREQ;
     }
 
     @Override

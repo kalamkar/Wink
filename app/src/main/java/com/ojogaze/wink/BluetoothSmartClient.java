@@ -21,6 +21,8 @@ import android.widget.Toast;
 public class BluetoothSmartClient extends EogDevice {
 	private static final String TAG = "BluetoothSmartClient";
 
+    private static final float SAMPLING_FREQ = 200f;
+
     private static final long DATA_UUID = 0x404846A1;
     private static final String BT_DEVICE_NAME_PREFIX = "Dovetail";
 
@@ -147,6 +149,11 @@ public class BluetoothSmartClient extends EogDevice {
 		adapter.getRemoteDevice(address)
                 .connectGatt(context, false /* auto connect */, gattCallback);
 	}
+
+    @Override
+    public float getSamplingFrequency() {
+        return SAMPLING_FREQ;
+    }
 
 	private void readCharacteristic(BluetoothGattCharacteristic characteristic) {
 		byte[] values = characteristic.getValue();

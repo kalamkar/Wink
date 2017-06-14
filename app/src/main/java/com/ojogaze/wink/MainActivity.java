@@ -10,6 +10,9 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.TextView;
 
+import java.util.Timer;
+import java.util.TimerTask;
+
 import biz.source_code.dsp.filter.FilterPassType;
 import biz.source_code.dsp.filter.IirFilter;
 import biz.source_code.dsp.filter.IirFilterDesignExstrom;
@@ -19,8 +22,7 @@ public class MainActivity extends AppCompatActivity implements EogDevice.Observe
 
     public static final int GRAPH_LENGTH = 1000;			// 5 seconds at 200Hz
 
-    private final IirFilter filter = new IirFilter(IirFilterDesignExstrom.design(
-            FilterPassType.bandpass, 1, 1.024 / Config.SAMPLING_FREQ, 2.56 / Config.SAMPLING_FREQ));
+    private IirFilter filter;
 
     private final int chartValues[] = new int[GRAPH_LENGTH];
     private EogDevice device;
@@ -39,12 +41,19 @@ public class MainActivity extends AppCompatActivity implements EogDevice.Observe
 
         chart = (ChartFragment) getSupportFragmentManager().findFragmentById(R.id.chart);
         count = (TextView) findViewById(R.id.count);
+        findViewById(R.id.eog).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Pair<Integer, Integer> minmax = getMinMax(chartValues);
+                Log.d(TAG, String.format("Min Max %d %d", minmax.first, minmax.second));
+            }
+        });
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        device = new BluetoothSmartClient(this);
+        device = new ShimmerClient(this);
         device.add(this);
         if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -52,6 +61,7 @@ public class MainActivity extends AppCompatActivity implements EogDevice.Observe
         } else {
             device.startScan();
         }
+        new Timer().schedule(chartUpdater, 100, 100);
     }
 
     @Override
@@ -97,6 +107,9 @@ public class MainActivity extends AppCompatActivity implements EogDevice.Observe
 
     public void onConnect(String address) {
         Log.i(TAG, String.format("Connected to %s", address));
+        float samplingFreq = device.getSamplingFrequency();
+        filter = new IirFilter(IirFilterDesignExstrom.design(
+                FilterPassType.bandpass, 1, 1.024 / samplingFreq, 2.56 / samplingFreq));
     }
 
     public void onDisconnect(String address) {
@@ -110,24 +123,30 @@ public class MainActivity extends AppCompatActivity implements EogDevice.Observe
         System.arraycopy(chartValues, values.length, chartValues, 0,
                 chartValues.length - values.length);
 
-         System.arraycopy(values, 0, chartValues, chartValues.length - values.length, values.length);
-//        for (int i = 0; i < values.length; i++) {
-//            chartValues[chartValues.length - values.length + i] = (int) filter.step(values[i]);
-//        }
-
-        final Pair<Integer, Integer> minMax = getMinMax(chartValues);
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                if (isDestroyed() || isRestricted() || isFinishing()) {
-                    return;
-                }
-                chart.clear();
-                chart.updateChannel1(chartValues, /* minMax*/ Pair.create(100, 150));
-                chart.updateUI();
-            }
-        });
+//         System.arraycopy(values, 0, chartValues, chartValues.length - values.length, values.length);
+        for (int i = 0; i < values.length; i++) {
+            chartValues[chartValues.length - values.length + i] = (int) filter.step(values[i]);
+        }
     }
+
+    private TimerTask chartUpdater = new TimerTask() {
+        @Override
+        public void run() {
+            Pair<Integer, Integer> minMax = Pair.create(-5000, 5000);
+            // getMinMax(chartValues); // Pair.create(100, 150);
+            chart.clear();
+            chart.updateChannel1(chartValues, minMax);
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    if (isDestroyed() || isRestricted() || isFinishing()) {
+                        return;
+                    }
+                    chart.updateUI();
+                }
+            });
+        }
+    };
 
     private void hideBars() {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);

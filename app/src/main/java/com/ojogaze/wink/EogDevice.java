@@ -50,6 +50,8 @@ public abstract class EogDevice {
 
     public abstract boolean isConnected();
 
+    public abstract float getSamplingFrequency();
+
     public abstract void close();
 
     public abstract void connect(String address);
