@@ -22,13 +22,14 @@ public class MainActivity extends AppCompatActivity implements EogDevice.Observe
 
     public static final int GRAPH_LENGTH = 1000;			// 5 seconds at 200Hz
 
-    private IirFilter filter;
-
-    private final int chartValues[] = new int[GRAPH_LENGTH];
+    private SaccadeRecognizer saccadeRecognizer;
     private EogDevice device;
 
     private ChartFragment chart;
     private TextView count;
+    private GestureView gestureView;
+
+    private Timer resetTimer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,10 +42,11 @@ public class MainActivity extends AppCompatActivity implements EogDevice.Observe
 
         chart = (ChartFragment) getSupportFragmentManager().findFragmentById(R.id.chart);
         count = (TextView) findViewById(R.id.count);
+        gestureView = (GestureView) findViewById(R.id.gestures);
         findViewById(R.id.eog).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Pair<Integer, Integer> minmax = getMinMax(chartValues);
+                Pair<Integer, Integer> minmax = getMinMax(saccadeRecognizer.window);
                 Log.d(TAG, String.format("Min Max %d %d", minmax.first, minmax.second));
             }
         });
@@ -107,9 +109,7 @@ public class MainActivity extends AppCompatActivity implements EogDevice.Observe
 
     public void onConnect(String address) {
         Log.i(TAG, String.format("Connected to %s", address));
-        float samplingFreq = device.getSamplingFrequency();
-        filter = new IirFilter(IirFilterDesignExstrom.design(
-                FilterPassType.bandpass, 1, 1.024 / samplingFreq, 2.56 / samplingFreq));
+        saccadeRecognizer = new SaccadeRecognizer(device.getSamplingFrequency());
     }
 
     public void onDisconnect(String address) {
@@ -120,22 +120,61 @@ public class MainActivity extends AppCompatActivity implements EogDevice.Observe
     }
 
     public void onNewValues(int values[]) {
-        System.arraycopy(chartValues, values.length, chartValues, 0,
-                chartValues.length - values.length);
-
-//         System.arraycopy(values, 0, chartValues, chartValues.length - values.length, values.length);
         for (int i = 0; i < values.length; i++) {
-            chartValues[chartValues.length - values.length + i] = (int) filter.step(values[i]);
+            saccadeRecognizer.update(values[i]);
+            if (!saccadeRecognizer.hasSaccade()
+                    || Math.abs(saccadeRecognizer.saccadeAmplitude) < 800) {
+                continue;
+            }
+            showGesture(saccadeRecognizer.saccadeAmplitude < 0
+                    ? GestureView.Direction.LEFT : GestureView.Direction.RIGHT);
         }
+    }
+
+    private void showGesture(final GestureView.Direction direction) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (isDestroyed() || isRestricted() || isFinishing()) {
+                    return;
+                }
+                gestureView.showArrow(direction, true /* clear */);
+                reset(1000);
+            }
+        });
+    }
+
+    private void reset(int delayMillis) {
+        if (resetTimer != null) {
+            resetTimer.cancel();
+        }
+        resetTimer = new Timer();
+        resetTimer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (isDestroyed() || isRestricted() || isFinishing()) {
+                            return;
+                        }
+                        gestureView.clear();
+                    }
+                });
+            }
+        }, delayMillis);
     }
 
     private TimerTask chartUpdater = new TimerTask() {
         @Override
         public void run() {
+            if (saccadeRecognizer == null) {
+                return;
+            }
             Pair<Integer, Integer> minMax = Pair.create(-5000, 5000);
-            // getMinMax(chartValues); // Pair.create(100, 150);
+            // getMinMax(saccadeRecognizer.window); // Pair.create(100, 150);
             chart.clear();
-            chart.updateChannel1(chartValues, minMax);
+            chart.updateChannel1(saccadeRecognizer.window, minMax);
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
