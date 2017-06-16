@@ -7,11 +7,16 @@
     android:layout_height="match_parent"
     tools:context="com.ojogaze.wink.MainActivity">
 
-    <fragment
-        android:id="@+id/chart"
+    <FrameLayout
+        android:id="@+id/chart_container"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:name="com.ojogaze.wink.ChartFragment"/>
+        android:layout_height="match_parent">
+        <fragment
+            android:id="@+id/chart"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:name="com.ojogaze.wink.ChartFragment"/>
+    </FrameLayout>
 
     <com.ojogaze.wink.GestureView
         android:id="@+id/gestures"
@@ -22,8 +27,23 @@
         android:id="@+id/count"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:textAppearance="?android:textAppearanceLarge"/>
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_margin="20dp"/>
+
+    <CheckBox
+        android:id="@+id/show_chart"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_margin="20dp"
+        android:checked="true"
+        android:text="@string/chart"/>
+
+    <Switch
+        android:id="@+id/toggle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"/>
 
     <ProgressBar
         android:id="@+id/progress"

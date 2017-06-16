@@ -9,8 +9,12 @@ import biz.source_code.dsp.filter.IirFilterDesignExstrom;
  */
 
 public class SaccadeRecognizer {
-    public final int window[] = new int[1024];
-    public final int feature1[] = new int[1024];
+    public static final int GRAPH_LENGTH = 1024;
+
+    public final int window[] = new int[GRAPH_LENGTH];
+    public final int feature1[] = new int[GRAPH_LENGTH];
+
+    private final int threshold;
 
     private int prevValue = 0;
     private int currentDirection = 0;  // Up or Down, Direction of change of values, not eyes
@@ -21,7 +25,8 @@ public class SaccadeRecognizer {
 
     private IirFilter filter;
 
-    public SaccadeRecognizer(float samplingFreq) {
+    public SaccadeRecognizer(float samplingFreq, int threshold) {
+        this.threshold = threshold;
         filter = new IirFilter(IirFilterDesignExstrom.design(
                 FilterPassType.bandpass, 1, 1.024 / samplingFreq, 2.56 / samplingFreq));
     }
@@ -58,6 +63,6 @@ public class SaccadeRecognizer {
     }
 
     public boolean hasSaccade() {
-        return saccadeLength > 0 && saccadeAmplitude != 0;
+        return saccadeLength > 0 && Math.abs(saccadeAmplitude) >= threshold ;
     }
 }
