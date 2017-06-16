@@ -143,6 +143,7 @@ public class MainActivity extends FragmentActivity implements EogDevice.Observer
             if (saccadeRecognizer.hasSaccade()) {
                 showGesture(saccadeRecognizer.saccadeAmplitude < 0
                         ? GestureView.Direction.LEFT : GestureView.Direction.RIGHT);
+                Log.d(TAG, String.format("Saccade amplitude %d", saccadeRecognizer.saccadeAmplitude));
             }
         }
     }

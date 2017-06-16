@@ -57,7 +57,7 @@ public class SaccadeRecognizer {
         }
 
         System.arraycopy(feature1, 1, feature1, 0, feature1.length - 1);
-        feature1[feature1.length - 1] = hasSaccade() ? saccadeAmplitude : 0;
+        feature1[feature1.length - 1] = hasSaccade() ? prevValue : 0;
 
         prevValue = value;
     }
