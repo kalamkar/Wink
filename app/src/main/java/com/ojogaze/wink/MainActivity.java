@@ -20,7 +20,7 @@ import biz.source_code.dsp.filter.IirFilterDesignExstrom;
 public class MainActivity extends AppCompatActivity implements EogDevice.Observer {
     private final static String TAG = "MainActivity";
 
-    public static final int GRAPH_LENGTH = 1000;			// 5 seconds at 200Hz
+    private static final int SACCADE_THRESHOLD = 10;  // 800
 
     private SaccadeRecognizer saccadeRecognizer;
     private EogDevice device;
@@ -55,7 +55,8 @@ public class MainActivity extends AppCompatActivity implements EogDevice.Observe
     @Override
     protected void onResume() {
         super.onResume();
-        device = new ShimmerClient(this);
+//        device = new ShimmerClient(this);
+        device = new BluetoothSmartClient(this);
         device.add(this);
         if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -123,7 +124,7 @@ public class MainActivity extends AppCompatActivity implements EogDevice.Observe
         for (int i = 0; i < values.length; i++) {
             saccadeRecognizer.update(values[i]);
             if (!saccadeRecognizer.hasSaccade()
-                    || Math.abs(saccadeRecognizer.saccadeAmplitude) < 800) {
+                    || Math.abs(saccadeRecognizer.saccadeAmplitude) < SACCADE_THRESHOLD) {
                 continue;
             }
             showGesture(saccadeRecognizer.saccadeAmplitude < 0
@@ -171,10 +172,13 @@ public class MainActivity extends AppCompatActivity implements EogDevice.Observe
             if (saccadeRecognizer == null) {
                 return;
             }
-            Pair<Integer, Integer> minMax = Pair.create(-5000, 5000);
-            // getMinMax(saccadeRecognizer.window); // Pair.create(100, 150);
+//            Pair<Integer, Integer> minMax = Pair.create(-5000, 5000);
+//            Pair<Integer, Integer> minMax = getMinMax(saccadeRecognizer.window);
+            Pair<Integer, Integer> minMax = Pair.create(100, 150);
+//            Pair<Integer, Integer> minMax = Pair.create(-20, 20);
             chart.clear();
             chart.updateChannel1(saccadeRecognizer.window, minMax);
+            chart.updateFeature1(saccadeRecognizer.feature1, minMax);
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {

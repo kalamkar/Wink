@@ -10,6 +10,7 @@ import biz.source_code.dsp.filter.IirFilterDesignExstrom;
 
 public class SaccadeRecognizer {
     public final int window[] = new int[1024];
+    public final int feature1[] = new int[1024];
 
     private int prevValue = 0;
     private int currentDirection = 0;  // Up or Down, Direction of change of values, not eyes
@@ -26,7 +27,7 @@ public class SaccadeRecognizer {
     }
 
     public void update(int value) {
-        value = (int) filter.step(value);
+//        value = (int) filter.step(value);
 
         System.arraycopy(window, 1, window, 0, window.length - 1);
         window[window.length - 1] = value;
@@ -49,6 +50,9 @@ public class SaccadeRecognizer {
             saccadeLength = 0;
             saccadeAmplitude = 0;
         }
+
+        System.arraycopy(feature1, 1, feature1, 0, feature1.length - 1);
+        feature1[feature1.length - 1] = hasSaccade() ? saccadeAmplitude : 0;
 
         prevValue = value;
     }
