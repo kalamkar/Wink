@@ -14,9 +14,9 @@ import java.util.List;
 public class ChartFragment extends Fragment {
     private static final String TAG = "ChartFragment";
 
-    private int darkBlue;
-    private int orange;
-    private int purple;
+    private int channel1Color;
+    private int feature1Color;
+    private int feature2Color;
 
     private ChartView chartView;
 
@@ -27,9 +27,9 @@ public class ChartFragment extends Fragment {
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        darkBlue = getResources().getColor(android.R.color.holo_blue_dark);
-        orange = getResources().getColor(android.R.color.holo_orange_dark);
-        purple = getResources().getColor(android.R.color.holo_purple);
+        channel1Color = getResources().getColor(android.R.color.holo_blue_dark);
+        feature1Color = getResources().getColor(android.R.color.holo_orange_dark);
+        feature2Color = getResources().getColor(android.R.color.holo_green_light);
         return inflater.inflate(R.layout.fragment_chart, container, false);
     }
 
@@ -38,14 +38,14 @@ public class ChartFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
 
         chartView = ((ChartView) getView().findViewById(R.id.eog));
-        channel1 = chartView.makeLineChart(darkBlue, 2);
-        channel1.setXRange(0, SaccadeRecognizer.GRAPH_LENGTH);
+        channel1 = chartView.makeLineChart(channel1Color, 2);
+        channel1.setXRange(0, GestureRecognizer.GRAPH_LENGTH);
 
-        feature1 = chartView.makePointsChart(orange, 3);
-        feature1.setXRange(0, SaccadeRecognizer.GRAPH_LENGTH);
+        feature1 = chartView.makePointsChart(feature1Color, 3);
+        feature1.setXRange(0, GestureRecognizer.GRAPH_LENGTH);
 
-        feature2 = chartView.makePointsChart(purple, 3);
-        feature2.setXRange(0, SaccadeRecognizer.GRAPH_LENGTH);
+        feature2 = chartView.makePointsChart(feature2Color, 3);
+        feature2.setXRange(0, GestureRecognizer.GRAPH_LENGTH);
     }
 
     public void clear() {

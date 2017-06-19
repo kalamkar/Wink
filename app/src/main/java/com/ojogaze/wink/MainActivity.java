@@ -20,17 +20,19 @@ public class MainActivity extends FragmentActivity implements EogDevice.Observer
     private final static String TAG = "MainActivity";
 
     private static final int SACCADE_THRESHOLD = 10;  // 800
+    private static final int FIXATION_MILLIS = 1000;  // 800
 
-    private SaccadeRecognizer saccadeRecognizer;
+    private GestureRecognizer saccadeRecognizer;
     private EogDevice device;
 
     private ChartFragment chart;
     private View chartContainer;
-    private TextView count;
+    private TextView countView;
     private GestureView gestureView;
     private Switch toggle;
 
     private Timer resetTimer;
+    private int count;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,7 +46,7 @@ public class MainActivity extends FragmentActivity implements EogDevice.Observer
 
         chart = (ChartFragment) getSupportFragmentManager().findFragmentById(R.id.chart);
         chartContainer = findViewById(R.id.chart_container);
-        count = (TextView) findViewById(R.id.count);
+        countView = (TextView) findViewById(R.id.count);
         gestureView = (GestureView) findViewById(R.id.gestures);
         toggle = (Switch) findViewById(R.id.toggle);
 
@@ -127,7 +129,9 @@ public class MainActivity extends FragmentActivity implements EogDevice.Observer
 
     public void onConnect(String address) {
         Log.i(TAG, String.format("Connected to %s", address));
-        saccadeRecognizer = new SaccadeRecognizer(device.getSamplingFrequency(), SACCADE_THRESHOLD);
+        saccadeRecognizer = new GestureRecognizer(
+                device.getSamplingFrequency(), SACCADE_THRESHOLD, FIXATION_MILLIS);
+        count = 0;
     }
 
     public void onDisconnect(String address) {
@@ -140,10 +144,13 @@ public class MainActivity extends FragmentActivity implements EogDevice.Observer
     public void onNewValues(int values[]) {
         for (int i = 0; i < values.length; i++) {
             saccadeRecognizer.update(values[i]);
-            if (saccadeRecognizer.hasSaccade()) {
+            if (saccadeRecognizer.hasGesture()) {
+                count++;
+                saccadeRecognizer.resetGesture();
+                Log.d(TAG, String.format("Saccade amplitude %d fixation %d",
+                        saccadeRecognizer.saccadeAmplitude, saccadeRecognizer.fixationSamples));
                 showGesture(saccadeRecognizer.saccadeAmplitude < 0
                         ? GestureView.Direction.LEFT : GestureView.Direction.RIGHT);
-                Log.d(TAG, String.format("Saccade amplitude %d", saccadeRecognizer.saccadeAmplitude));
             }
         }
     }
@@ -158,6 +165,7 @@ public class MainActivity extends FragmentActivity implements EogDevice.Observer
                 gestureView.showArrow(direction, true /* clear */);
                 reset(1000);
                 toggle.setChecked(!toggle.isChecked());
+                countView.setText(Integer.toString(count));
             }
         });
     }
@@ -196,6 +204,7 @@ public class MainActivity extends FragmentActivity implements EogDevice.Observer
             chart.clear();
             chart.updateChannel1(saccadeRecognizer.window, minMax);
             chart.updateFeature1(saccadeRecognizer.feature1, minMax);
+            chart.updateFeature2(saccadeRecognizer.feature2, minMax);
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
