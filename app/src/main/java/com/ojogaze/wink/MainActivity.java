@@ -19,10 +19,10 @@ import java.util.TimerTask;
 public class MainActivity extends FragmentActivity implements EogDevice.Observer {
     private final static String TAG = "MainActivity";
 
-    private static final int SACCADE_THRESHOLD = 10;  // 800
-    private static final int FIXATION_MILLIS = 1000;  // 800
+    private static final int SACCADE_THRESHOLD = 7;  // 800
+    private static final int FIXATION_MILLIS = 2000;
 
-    private GestureRecognizer saccadeRecognizer;
+    private GestureRecognizer gestureRecognizer;
     private EogDevice device;
 
     private ChartFragment chart;
@@ -53,10 +53,10 @@ public class MainActivity extends FragmentActivity implements EogDevice.Observer
         findViewById(R.id.eog).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                if (saccadeRecognizer == null) {
+                if (gestureRecognizer == null) {
                     return;
                 }
-                Pair<Integer, Integer> minmax = getMinMax(saccadeRecognizer.window);
+                Pair<Integer, Integer> minmax = getMinMax(gestureRecognizer.window);
                 Log.d(TAG, String.format("Min Max %d %d", minmax.first, minmax.second));
             }
         });
@@ -129,7 +129,7 @@ public class MainActivity extends FragmentActivity implements EogDevice.Observer
 
     public void onConnect(String address) {
         Log.i(TAG, String.format("Connected to %s", address));
-        saccadeRecognizer = new GestureRecognizer(
+        gestureRecognizer = new GestureRecognizer(
                 device.getSamplingFrequency(), SACCADE_THRESHOLD, FIXATION_MILLIS);
         count = 0;
     }
@@ -143,26 +143,25 @@ public class MainActivity extends FragmentActivity implements EogDevice.Observer
 
     public void onNewValues(int values[]) {
         for (int i = 0; i < values.length; i++) {
-            saccadeRecognizer.update(values[i]);
-            if (saccadeRecognizer.hasGesture()) {
+            gestureRecognizer.update(values[i]);
+            if (gestureRecognizer.hasGesture()) {
                 count++;
-                saccadeRecognizer.resetGesture();
-                Log.d(TAG, String.format("Saccade amplitude %d fixation %d",
-                        saccadeRecognizer.saccadeAmplitude, saccadeRecognizer.fixationSamples));
-                showGesture(saccadeRecognizer.saccadeAmplitude < 0
-                        ? GestureView.Direction.LEFT : GestureView.Direction.RIGHT);
+                gestureRecognizer.resetGesture();
+//                Log.d(TAG, String.format("Saccade amplitude %d fixation %d",
+//                        gestureRecognizer.saccadeAmplitude, gestureRecognizer.fixationSamples));
+                showGesture();
             }
         }
     }
 
-    private void showGesture(final GestureView.Direction direction) {
+    private void showGesture() {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
                 if (isDestroyed() || isRestricted() || isFinishing()) {
                     return;
                 }
-                gestureView.showArrow(direction, true /* clear */);
+                // gestureView.showArrow(direction, true /* clear */);
                 reset(1000);
                 toggle.setChecked(!toggle.isChecked());
                 countView.setText(Integer.toString(count));
@@ -194,17 +193,17 @@ public class MainActivity extends FragmentActivity implements EogDevice.Observer
     private TimerTask chartUpdater = new TimerTask() {
         @Override
         public void run() {
-            if (saccadeRecognizer == null) {
+            if (gestureRecognizer == null) {
                 return;
             }
 //            Pair<Integer, Integer> minMax = Pair.create(-5000, 5000);
-//            Pair<Integer, Integer> minMax = getMinMax(saccadeRecognizer.window);
+//            Pair<Integer, Integer> minMax = getMinMax(gestureRecognizer.window);
             Pair<Integer, Integer> minMax = Pair.create(100, 150);
 //            Pair<Integer, Integer> minMax = Pair.create(-20, 20);
             chart.clear();
-            chart.updateChannel1(saccadeRecognizer.window, minMax);
-            chart.updateFeature1(saccadeRecognizer.feature1, minMax);
-            chart.updateFeature2(saccadeRecognizer.feature2, minMax);
+            chart.updateChannel1(gestureRecognizer.window, minMax);
+            chart.updateFeature1(gestureRecognizer.feature1, minMax);
+            chart.updateFeature2(gestureRecognizer.feature2, minMax);
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
