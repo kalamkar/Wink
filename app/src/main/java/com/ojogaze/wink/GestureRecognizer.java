@@ -1,9 +1,5 @@
 package com.ojogaze.wink;
 
-import biz.source_code.dsp.filter.FilterPassType;
-import biz.source_code.dsp.filter.IirFilter;
-import biz.source_code.dsp.filter.IirFilterDesignExstrom;
-
 /**
  * Created by abhi on 6/15/17.
  */
@@ -16,8 +12,8 @@ public class GestureRecognizer {
     public final int feature2[] = new int[GRAPH_LENGTH];
 
     private final float samplingFreq;
-    private final int threshold;
-    private final long fixationThresholdMillis;
+    private final int saccadeAmplitudeThreshold;
+    private final int fixationThreshold;
 
     private int prevValue = 0;
     private int currentDirection = 0;  // Up or Down, Direction of change of values, not eyes
@@ -28,18 +24,20 @@ public class GestureRecognizer {
     public int fixationSamples;
     public int lastFixationSamplesAgo = Integer.MAX_VALUE;
 
-    private IirFilter filter;
+    // private IirFilter filter;
+    private CustomFilter filter = new CustomFilter();
 
-    public GestureRecognizer(float samplingFreq, int threshold, long fixationThresholdMillis) {
+    public GestureRecognizer(float samplingFreq, int saccadeAmplitudeThreshold,
+                             long fixationThresholdMillis) {
         this.samplingFreq = samplingFreq;
-        this.threshold = threshold;
-        this.fixationThresholdMillis = fixationThresholdMillis;
-        filter = new IirFilter(IirFilterDesignExstrom.design(
-                FilterPassType.bandpass, 1, 1.024 / samplingFreq, 2.56 / samplingFreq));
+        this.saccadeAmplitudeThreshold = saccadeAmplitudeThreshold;
+        this.fixationThreshold = (int) (fixationThresholdMillis / (1000 / samplingFreq));
+//        filter = new IirFilter(IirFilterDesignExstrom.design(
+//                FilterPassType.bandpass, 1, 1.024 / samplingFreq, 2.56 / samplingFreq));
     }
 
     public void update(int value) {
-//        value = (int) filter.step(value);
+        value = (int) filter.step(value);
 
         System.arraycopy(window, 1, window, 0, window.length - 1);
         window[window.length - 1] = value;
@@ -49,10 +47,11 @@ public class GestureRecognizer {
         int newDirection = value - prevValue;
         newDirection /= newDirection != 0 ? Math.abs(newDirection) : 1;
 
-        float fixationThreshold = /* stats.stdDev; */ threshold / 1.5f;
-        fixationSamples = Math.abs(saccadeAmplitude) < fixationThreshold ? fixationSamples + 1 : 1;
+        float fixationAmplitudeThreshold = 3 * stats.stdDev;
+        fixationSamples = Math.abs(stats.median - value) < fixationAmplitudeThreshold
+                ? fixationSamples + 1 : 1;
         System.arraycopy(feature2, 1, feature2, 0, feature2.length - 1);
-        if (fixationSamples >= fixationThresholdMillis / (1000 / samplingFreq)) {
+        if (fixationSamples >= fixationThreshold) {
             feature2[Math.max(0, feature2.length - fixationSamples)] = stats.median;
             feature2[feature2.length - 1] = stats.median;
             lastFixationSamplesAgo = 0;
@@ -84,16 +83,17 @@ public class GestureRecognizer {
     }
 
     public boolean hasGesture() {
-        return (saccadeLength > 0 && Math.abs(saccadeAmplitude) >= threshold)
+        return (saccadeLength > 0 && Math.abs(saccadeAmplitude) >= saccadeAmplitudeThreshold)
                 && (lastFixationSamplesAgo < (200 / (1000 / samplingFreq)));
     }
 
     public void resetGesture() {
         lastFixationSamplesAgo = Integer.MAX_VALUE;
+        fixationSamples = 1;
     }
 
 //    public boolean hasSaccade() {
-//        return saccadeLength > 0 && Math.abs(saccadeAmplitude) >= threshold;
+//        return saccadeLength > 0 && Math.abs(saccadeAmplitude) >= saccadeAmplitudeThreshold;
 //    }
 //
 //    public boolean hasFixation() {
