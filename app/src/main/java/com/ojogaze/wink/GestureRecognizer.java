@@ -56,7 +56,7 @@ public class GestureRecognizer {
     }
 
     public void resetGesture() {
-        fixations.lastFixationSamplesAgo = Integer.MAX_VALUE;
+        fixations.lastFixationSamplesAgo = fixations.lengthTolerance + 1;
         fixations.fixationLength = 0;
     }
 
@@ -64,15 +64,15 @@ public class GestureRecognizer {
         private final int lengthThreshold;
         private final int lengthTolerance;
 
-        public int fixationLength;
-        public int lastFixationSamplesAgo = Integer.MAX_VALUE;
+        private int fixationLength;
+        private int lastFixationSamplesAgo = Integer.MAX_VALUE;
 
         FixationRecognizer(float samplingFreq, long fixationThresholdMillis) {
             lengthThreshold = (int) (fixationThresholdMillis / (1000 / samplingFreq));
             lengthTolerance = (int) (200 / (1000 / samplingFreq));
         }
 
-        public void update(int value, int base, int amplitudeThreshold) {
+        private void update(int value, int base, int amplitudeThreshold) {
             fixationLength = Math.abs(value - base) < amplitudeThreshold ? fixationLength + 1 : 0;
             if (fixationLength >= lengthThreshold) {
                 lastFixationSamplesAgo = 0;
@@ -93,8 +93,8 @@ public class GestureRecognizer {
         private int currentDirection = 0;  // Up or Down, Direction of change of values, not eyes
         private int countSinceLatestDirectionChange = 0;
 
-        public int saccadeLength = 0;
-        public int saccadeAmplitude = 0;
+        private int saccadeLength = 0;
+        private int saccadeAmplitude = 0;
 
         SaccadeRecognizer(int amplitudeThreshold) {
             this.amplitudeThreshold = amplitudeThreshold;
